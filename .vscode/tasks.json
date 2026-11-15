@@ -1,0 +1,46 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "1. Run FoodLoop Backend (Java)",
+      "type": "shell",
+      "command": ".\\run.bat",
+      "options": {
+        "cwd": "${workspaceFolder}/backend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "group": "backend",
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "2. Run FoodLoop Frontend (React)",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "problemMatcher": [],
+      "presentation": {
+        "group": "frontend",
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Run Full FoodLoop System (All)",
+      "type": "shell",
+      "command": ".\\start-all.bat",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}

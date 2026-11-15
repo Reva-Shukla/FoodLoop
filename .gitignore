@@ -1,0 +1,15 @@
+# Dependency directories
+frontend/node_modules/
+frontend/dist/
+
+# Build artifacts & bytecode
+backend/bin/
+*.class
+
+# Log files
+*.log
+npm-debug.log*
+
+# Environment and OS files
+.DS_Store
+Thumbs.db
