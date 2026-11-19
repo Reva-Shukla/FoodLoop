@@ -15,7 +15,7 @@ public class DonationExpiryMonitor {
         scheduler.scheduleAtFixedRate(() -> {
             System.out.println("\n[Background Thread] Checking expired donations...");
 
-            String sql = "UPDATE donations SET status = 'EXPIRED' WHERE status = 'AVAILABLE' AND STR_TO_DATE(deadline, '%d/%m/%Y') < CURDATE()";
+             String sql = "UPDATE donations SET status = 'EXPIRED' WHERE status = 'AVAILABLE' AND STR_TO_DATE(deadline, '%d/%m/%Y') < CURDATE()";
 
             try (Connection con = DBConnection.getConnection();
                  PreparedStatement ps = con.prepareStatement(sql)) {

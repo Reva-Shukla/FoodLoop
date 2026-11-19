@@ -36,20 +36,13 @@ public class MealRecord {
         return served;
     }
 
-    public String getMealDate(){
-        if (mealDate == null || mealDate.isEmpty()) {
+   public String getMealDate() {
+    if (mealDate == null || mealDate.isEmpty()) {
         return "Not Available";
     }
 
-    java.time.LocalDate date = java.time.LocalDate.parse(
-        mealDate,
-        java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
-    );
-
-    return date.format(
-        java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy")
-    );
-    }
+    return mealDate;
+}
 
 
 }

@@ -51,20 +51,13 @@ public class Donation {
         return pickupLocation;
     }
 
-    public String getDeadline(){
-       if (deadline == null || deadline.isEmpty()) {
+   public String getDeadline() {
+    if (deadline == null || deadline.isEmpty()) {
         return "Not Available";
     }
 
-    java.time.LocalDate date = java.time.LocalDate.parse(
-        deadline,
-        java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy")
-    );
-
-    return date.format(
-        java.time.format.DateTimeFormatter.ofPattern("dd-MM-yyyy")
-    );
-    }
+    return deadline;
+}
 
     public int getDonationId(){
         return donationId;
