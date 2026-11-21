@@ -1,0 +1,108 @@
+/* Editorial Typography Styles — Inspired by Savora & Legurmè */
+
+body {
+  font-family: var(--font-sans);
+  color: var(--text-dark);
+  font-size: 1rem;
+  line-height: 1.65;
+  background-color: var(--color-cream);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Headings */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  color: var(--text-primary);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+
+/* Expressive Italic Display Words */
+.editorial-italic {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  color: inherit;
+}
+
+/* Display Titles */
+.display-hero {
+  font-size: clamp(2.8rem, 6.2vw, 5.2rem);
+  font-weight: 500;
+  line-height: 1.04;
+  letter-spacing: -0.035em;
+  color: var(--color-forest-dark);
+}
+
+.display-section {
+  font-size: clamp(2.1rem, 4.2vw, 3.4rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--color-forest-dark);
+}
+
+.display-subheading {
+  font-size: clamp(1.4rem, 2.5vw, 1.9rem);
+  font-weight: 500;
+  line-height: 1.25;
+}
+
+/* Micro-Tag / Editorial Kicker */
+.kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-sans);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--color-forest);
+  background-color: var(--color-forest-surface);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(24, 60, 50, 0.12);
+  margin-bottom: 16px;
+}
+
+.kicker.kicker-light {
+  color: var(--color-sage);
+  background-color: rgba(169, 198, 160, 0.12);
+  border-color: rgba(169, 198, 160, 0.25);
+}
+
+.kicker.kicker-saffron {
+  color: var(--color-saffron-dark);
+  background-color: var(--color-saffron-light);
+  border-color: rgba(230, 162, 60, 0.3);
+}
+
+.kicker.kicker-terracotta {
+  color: var(--color-terracotta);
+  background-color: var(--color-terracotta-light);
+  border-color: rgba(201, 108, 75, 0.3);
+}
+
+/* Editorial Body Text */
+.lead-text {
+  font-size: clamp(1.05rem, 1.4vw, 1.22rem);
+  line-height: 1.6;
+  color: var(--text-secondary);
+  font-weight: 400;
+  max-width: 640px;
+}
+
+.lead-text-dark {
+  color: var(--text-cream-muted);
+}
+
+.caption {
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
