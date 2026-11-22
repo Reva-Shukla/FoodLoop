@@ -1,9 +1,6 @@
 package foodloop.src.Dao;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import foodloop.src.Database.DBConnection;
@@ -11,288 +8,205 @@ import foodloop.src.Model.Claim;
 import foodloop.src.Model.Donation;
 import foodloop.src.Model.Pickup;
 
-import java.sql.Statement;
-
 public class DonationDAO {
-    public boolean addDonation(Donation donation) throws SQLException{
-        Connection con=DBConnection.getConnection();
-        String sql="insert into donations(mess_id,food_name,quantity,food_type,pickup_location,deadline) values(?,?,?,?,?,?)";
 
-        PreparedStatement ps=con.prepareStatement(sql);
+    // ==================== DONATIONS ====================
 
-        ps.setInt(1,donation.getMessId());
-        ps.setString(2,donation.getFoodName());
-        ps.setInt(3,donation.getQuantity());
-        ps.setString(4,donation.getFoodType());
-        ps.setString(5,donation.getPickupLocation());
-        ps.setString(6,donation.getDeadline());
+    public boolean addDonation(Donation donation) throws SQLException {
+        String sql = "INSERT INTO donations (meal_record_id, mess_id, food_name, quantity, food_type, pickup_location, deadline, preparation_datetime, storage_conditions, allergens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        int rowAffected=ps.executeUpdate();
-        ps.close();
-        con.close();
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
 
-        if(rowAffected==1){
-            return true;
-        }
-        else{
-            return false;
+            if (donation.getMealRecordId() > 0) {
+                ps.setInt(1, donation.getMealRecordId());
+            } else {
+                ps.setNull(1, Types.INTEGER);
+            }
+            ps.setString(2, donation.getMessId());
+            ps.setString(3, donation.getFoodName());
+            ps.setInt(4, donation.getQuantity());
+            ps.setString(5, donation.getFoodType());
+            ps.setString(6, donation.getPickupLocation());
+            ps.setString(7, donation.getDeadline());
+            ps.setString(8, donation.getPreparationDatetime());
+            ps.setString(9, donation.getStorageConditions());
+            ps.setString(10, donation.getAllergens());
+
+            return ps.executeUpdate() == 1;
         }
     }
 
-    public int getTotalDonated(int messId) throws SQLException {
+    public int getTotalDonated(String messId) throws SQLException {
         String sql = "SELECT COALESCE(SUM(quantity), 0) AS total FROM donations WHERE mess_id = ? AND status IN ('AVAILABLE', 'CLAIMED', 'PICKED_UP')";
 
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql)) {
-
-            ps.setInt(1, messId);
-            ResultSet rs = ps.executeQuery();
-
-            if (rs.next()) {
-                return rs.getInt("total");
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, messId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return rs.getInt("total");
             }
         }
         return 0;
     }
 
-    public List<Donation> getDonations(int messId) throws SQLException{
-        List<Donation> donations=new ArrayList<>();
-        String sql="select * from donations where mess_id=?";
-        try(Connection con=DBConnection.getConnection();
-            PreparedStatement ps=con.prepareStatement(sql)){
-                 ps.setInt(1,messId);
+    // Legacy overload
+    public int getTotalDonated(int messId) throws SQLException {
+        return getTotalDonated(String.valueOf(messId));
+    }
 
-                ResultSet rs=ps.executeQuery();
-                while (rs.next()){
-                    Donation donate=new Donation(
-                        rs.getInt("mess_id"),
-                        rs.getString("food_name"),
-                        rs.getInt("quantity"),
-                        rs.getString("food_type"),
-                        rs.getString("pickup_location"),
-                        rs.getString("deadline"),
-                        rs.getInt("donation_id"),
-                        rs.getString("status")
-                    );
-                    donations.add(donate);
+    public List<Donation> getDonations(String messId) throws SQLException {
+        List<Donation> donations = new ArrayList<>();
+        String sql = "SELECT d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM donations d LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE d.mess_id = ? ORDER BY d.created_at DESC";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, messId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    donations.add(buildDonation(rs));
                 }
+            }
         }
         return donations;
     }
 
-    public List<Donation> getAvailableDonations() throws SQLException{
-        List<Donation> donations=new ArrayList<>();
-        String sql="select * from donations WHERE status = 'AVAILABLE'";
+    // Legacy overload
+    public List<Donation> getDonations(int messId) throws SQLException {
+        return getDonations(String.valueOf(messId));
+    }
 
-        try(Connection con=DBConnection.getConnection();
-            PreparedStatement ps=con.prepareStatement(sql)){
+    public Donation getDonationById(int donationId) throws SQLException {
+        String sql = "SELECT d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM donations d LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE d.donation_id = ?";
 
-                ResultSet rs=ps.executeQuery();
-                while (rs.next()){
-                    Donation donate=new Donation(
-                        rs.getInt("mess_id"),
-                        rs.getString("food_name"),
-                        rs.getInt("quantity"),
-                        rs.getString("food_type"),
-                        rs.getString("pickup_location"),
-                        rs.getString("deadline"),
-                        rs.getInt("donation_id"),
-                        rs.getString("status")
-                    );
-                    donations.add(donate);
-                }
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, donationId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) return buildDonation(rs);
+            }
+        }
+        return null;
+    }
+
+    public List<Donation> getAvailableDonations() throws SQLException {
+        List<Donation> donations = new ArrayList<>();
+        String sql = "SELECT d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM donations d LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE d.status = 'AVAILABLE' AND d.deadline > NOW() ORDER BY d.deadline ASC";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                donations.add(buildDonation(rs));
+            }
         }
         return donations;
     }
 
-    public boolean claimDonation(int donationId, int ngoId) throws SQLException{
-        String checkSql="select donation_id from donations where donation_id=? and status='AVAILABLE' for update";
+    public List<Donation> getAllDonations() throws SQLException {
+        List<Donation> donations = new ArrayList<>();
+        String sql = "SELECT d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM donations d LEFT JOIN hostels h ON d.mess_id = h.hostel_id ORDER BY d.created_at DESC";
 
-        try(Connection con=DBConnection.getConnection()){
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                donations.add(buildDonation(rs));
+            }
+        }
+        return donations;
+    }
+
+    // ==================== CLAIMS ====================
+
+    public boolean claimDonation(int donationId, int ngoId) throws SQLException {
+        String checkSql = "SELECT d.donation_id, d.deadline, d.pickup_location FROM donations d WHERE d.donation_id = ? AND d.status = 'AVAILABLE' AND d.deadline > NOW() FOR UPDATE";
+
+        try (Connection con = DBConnection.getConnection()) {
             con.setAutoCommit(false);
+            try {
+                String deadlineStr;
+                String pickupLocation;
 
-            try{
-                try(PreparedStatement ps=con.prepareStatement(checkSql)){
-                    ps.setInt(1,donationId);
-
-                    try(ResultSet rs=ps.executeQuery()){
-                        if(!rs.next()){
+                // 1. Check donation is available and not expired
+                try (PreparedStatement ps = con.prepareStatement(checkSql)) {
+                    ps.setInt(1, donationId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
                             con.rollback();
                             return false;
                         }
+                        deadlineStr = rs.getString("deadline");
+                        pickupLocation = rs.getString("pickup_location");
                     }
                 }
 
-                String claimSql="INSERT INTO claims(donation_id, ngo_id)VALUES (?, ?)";
+                // 2. Create claim record
+                String claimSql = "INSERT INTO claims (donation_id, ngo_id, pickup_deadline, pickup_location) VALUES (?, ?, ?, ?)";
                 int claimId;
 
-                try(PreparedStatement ps1=con.prepareStatement(claimSql,Statement.RETURN_GENERATED_KEYS)){
-                    ps1.setInt(1,donationId);
+                try (PreparedStatement ps1 = con.prepareStatement(claimSql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps1.setInt(1, donationId);
                     ps1.setInt(2, ngoId);
-                    int inserted=ps1.executeUpdate();
-                    if(inserted!=1){
+                    ps1.setString(3, deadlineStr);
+                    ps1.setString(4, pickupLocation);
+                    if (ps1.executeUpdate() != 1) {
+                        con.rollback();
                         return false;
                     }
-
-                    try (ResultSet rs=ps1.getGeneratedKeys()){
+                    try (ResultSet rs = ps1.getGeneratedKeys()) {
                         if (rs.next()) {
-                            claimId=rs.getInt(1);
-                        } else{
+                            claimId = rs.getInt(1);
+                        } else {
                             throw new SQLException("Claim ID not generated!");
                         }
                     }
                 }
 
-            String pickupSql = "INSERT INTO pickups(claim_id) VALUES (?)";
-            try (PreparedStatement ps2 = con.prepareStatement(pickupSql)) {
-                ps2.setInt(1, claimId);
-                int inserted = ps2.executeUpdate();
-                if (inserted != 1) {
-                    con.rollback();
-                    return false;
-                }
-            }
-
-                String updateSql="update donations set status='CLAIMED' where donation_id=?";
-                try(PreparedStatement ps3=con.prepareStatement(updateSql)){
-                    ps3.setInt(1,donationId);
-                    int updated=ps3.executeUpdate();
-                    if(updated!=1){
+                // 3. Create pickup record
+                String pickupSql = "INSERT INTO pickups (claim_id, donation_id, ngo_id, pickup_deadline, pickup_location) VALUES (?, ?, ?, ?, ?)";
+                try (PreparedStatement ps2 = con.prepareStatement(pickupSql)) {
+                    ps2.setInt(1, claimId);
+                    ps2.setInt(2, donationId);
+                    ps2.setInt(3, ngoId);
+                    ps2.setString(4, deadlineStr);
+                    ps2.setString(5, pickupLocation);
+                    if (ps2.executeUpdate() != 1) {
                         con.rollback();
                         return false;
-                    }           
+                    }
                 }
+
+                // 4. Update donation status
+                String updateSql = "UPDATE donations SET status = 'CLAIMED' WHERE donation_id = ?";
+                try (PreparedStatement ps3 = con.prepareStatement(updateSql)) {
+                    ps3.setInt(1, donationId);
+                    if (ps3.executeUpdate() != 1) {
+                        con.rollback();
+                        return false;
+                    }
+                }
+
                 con.commit();
                 return true;
-            }
-            catch(SQLException e){
+            } catch (SQLException e) {
                 con.rollback();
                 throw e;
             }
         }
     }
 
-    public List<Donation> getMyClaims(int ngoId) throws SQLException{
-        List<Donation> donations=new ArrayList<>();
-       String sql = "SELECT c.claim_id, c.donation_id, c.claim_date,c.status,d.mess_id,d.food_name,d.quantity,d.food_type,d.pickup_location,d.deadline FROM claims c INNER JOIN donations d ON c.donation_id = d.donation_id WHERE c.ngo_id = ?";
-       try(Connection con=DBConnection.getConnection();
-            PreparedStatement ps=con.prepareStatement(sql)){
-            ps.setInt(1, ngoId);
-
-            try(ResultSet rs=ps.executeQuery()){
-            
-                while(rs.next()){
-                    Donation donate=new Donation(
-                        rs.getInt("mess_id"),
-                        rs.getString("food_name"),
-                        rs.getInt("quantity"),
-                        rs.getString("food_type"),
-                        rs.getString("pickup_location"),
-                        rs.getString("deadline"),
-                        rs.getInt("donation_id"),
-                        rs.getString("status")
-                    );
-                    donations.add(donate);
-                }
-            }
-        }
-        return donations;
-    }
-
-    public List<Pickup> getMyPickups(int ngoId) throws SQLException{
-        List<Pickup> pickups = new ArrayList<>();
-
-    String sql = "SELECT p.pickup_id, p.claim_id, c.donation_id,c.ngo_id, u.name AS ngo_name, d.food_name,d.quantity, d.pickup_location, p.pickup_date, p.status FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id INNER JOIN donations d ON c.donation_id = d.donation_id INNER JOIN users u ON c.ngo_id = u.user_id";
-
-    try (Connection con = DBConnection.getConnection();
-         PreparedStatement ps = con.prepareStatement(sql);
-         ResultSet rs = ps.executeQuery()) {
-        while (rs.next()) {
-            Pickup pickup = new Pickup(
-                rs.getInt("pickup_id"),
-                rs.getInt("claim_id"),
-                rs.getInt("donation_id"),
-                rs.getString("food_name"),
-                rs.getInt("quantity"),
-                rs.getString("pickup_location"),
-                rs.getString("pickup_date"),
-                rs.getString("status"),
-                rs.getString("ngo_name")
-            );
-            pickups.add(pickup);
-        }
-    }
-
-    return pickups;
-    }
-
-    public boolean completePickup(int pickupId, int ngoId) throws SQLException{
-        String checkSql="SELECT p.pickup_id,c.donation_id FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id WHERE p.pickup_id = ? AND c.ngo_id = ? AND p.status = 'SCHEDULED' FOR UPDATE";
-        try(Connection con=DBConnection.getConnection()){
-            con.setAutoCommit(false);
-            try{
-                int donationId;
-                try(PreparedStatement ps=con.prepareStatement(checkSql)){
-                    ps.setInt(1, pickupId);
-                    ps.setInt(2, ngoId);
-
-                    try(ResultSet rs=ps.executeQuery()){
-                        if(!rs.next()){
-                            con.rollback();
-                            return false;
-                        }
-                        donationId = rs.getInt("donation_id");
-                    }
-                }
-
-                String pickupSql="update pickups set status='COMPLETED' where pickup_id=? and status='SCHEDULED'";
-                try (PreparedStatement ps1 = con.prepareStatement(pickupSql)) {
-                    ps1.setInt(1, pickupId);
-                    int updated = ps1.executeUpdate();
-
-                    if (updated != 1) {
-                        con.rollback();
-                        return false;
-                    }
-                }
-                String donationSql = "UPDATE donations SET status = 'PICKED_UP' WHERE donation_id = ? AND status = 'CLAIMED'";
-                try (PreparedStatement ps2 = con.prepareStatement(donationSql)) {
-                    ps2.setInt(1, donationId);
-                    int updated = ps2.executeUpdate();
-                    if (updated != 1) {
-                        con.rollback();
-                        return false;
-                    }
-                }
-                con.commit();
-                return true;
-
-            } 
-            catch (SQLException e) {
-                con.rollback();
-                throw e;
-            }
-        }
-    }
-
-    public List<Donation> getAllDonations() throws SQLException {
+    public List<Donation> getMyClaims(int ngoId) throws SQLException {
         List<Donation> donations = new ArrayList<>();
-        String sql = "SELECT * FROM donations";
+        String sql = "SELECT c.claim_id, c.donation_id, c.claim_date, c.status AS claim_status, d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM claims c INNER JOIN donations d ON c.donation_id = d.donation_id LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE c.ngo_id = ? ORDER BY c.claim_date DESC";
+
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql);
-            ResultSet rs = ps.executeQuery()) {
-            while (rs.next()) {
-                Donation donate = new Donation(
-                    rs.getInt("mess_id"),
-                    rs.getString("food_name"),
-                    rs.getInt("quantity"),
-                    rs.getString("food_type"),
-                    rs.getString("pickup_location"),
-                    rs.getString("deadline"),
-                    rs.getInt("donation_id"),
-                    rs.getString("status")
-                );
-                donations.add(donate);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, ngoId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    donations.add(buildDonation(rs));
+                }
             }
         }
         return donations;
@@ -300,75 +214,140 @@ public class DonationDAO {
 
     public List<Claim> getAllClaims() throws SQLException {
         List<Claim> claims = new ArrayList<>();
-        String sql = "SELECT c.claim_id, c.donation_id, c.ngo_id,u.name AS ngo_name, d.food_name, d.quantity,c.claim_date, c.status FROM claims c INNER JOIN donations d ON c.donation_id = d.donation_id INNER JOIN users u ON c.ngo_id = u.user_id";
+        String sql = "SELECT c.claim_id, c.donation_id, c.ngo_id, u.name AS ngo_name, d.mess_id, h.name AS mess_name, d.food_name, d.food_type, d.quantity, c.claim_date, c.pickup_deadline, c.pickup_location, c.status FROM claims c INNER JOIN donations d ON c.donation_id = d.donation_id INNER JOIN users u ON c.ngo_id = u.user_id LEFT JOIN hostels h ON d.mess_id = h.hostel_id ORDER BY c.claim_date DESC";
 
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql);
-            ResultSet rs = ps.executeQuery()){
-
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
             while (rs.next()) {
-                Claim claim = new Claim(
+                claims.add(new Claim(
                     rs.getInt("claim_id"),
                     rs.getInt("donation_id"),
                     rs.getInt("ngo_id"),
                     rs.getString("ngo_name"),
+                    rs.getString("mess_id"),
+                    rs.getString("mess_name"),
                     rs.getString("food_name"),
+                    rs.getString("food_type"),
                     rs.getInt("quantity"),
                     rs.getString("claim_date"),
+                    rs.getString("pickup_deadline"),
+                    rs.getString("pickup_location"),
                     rs.getString("status")
-                );
-                claims.add(claim);
+                ));
             }
         }
         return claims;
     }
 
-    public List<Pickup> getAllPickups() throws SQLException {
+    // ==================== PICKUPS ====================
+
+    public List<Pickup> getMyPickups(int ngoId) throws SQLException {
         List<Pickup> pickups = new ArrayList<>();
-        String sql = "SELECT p.pickup_id, p.claim_id, c.donation_id,u.name AS ngo_name, d.food_name, d.quantity,d.pickup_location, p.pickup_date, p.status FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id INNER JOIN donations d ON c.donation_id = d.donation_id INNER JOIN users u ON c.ngo_id = u.user_id";
+        String sql = "SELECT p.pickup_id, p.claim_id, p.donation_id, p.ngo_id, u.name AS ngo_name, d.mess_id, h.name AS mess_name, d.food_name, d.food_type, d.quantity, d.pickup_location, p.pickup_deadline, p.pickup_date, p.scheduled_at, p.completed_at, p.status FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id INNER JOIN donations d ON p.donation_id = d.donation_id INNER JOIN users u ON p.ngo_id = u.user_id LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE p.ngo_id = ? ORDER BY p.scheduled_at DESC";
 
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql);
-            ResultSet rs = ps.executeQuery()) {
-
-            while (rs.next()) {
-                Pickup pickup = new Pickup(
-                    rs.getInt("pickup_id"),
-                    rs.getInt("claim_id"),
-                    rs.getInt("donation_id"),
-                    rs.getString("food_name"),
-                    rs.getInt("quantity"),
-                    rs.getString("pickup_location"),
-                    rs.getString("pickup_date"),
-                    rs.getString("status"),
-                    rs.getString("ngo_name")
-                );
-                pickups.add(pickup);
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, ngoId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    pickups.add(buildPickup(rs));
+                }
             }
         }
         return pickups;
     }
 
+    public boolean completePickup(int pickupId, int ngoId) throws SQLException {
+        String checkSql = "SELECT p.pickup_id, p.donation_id, c.claim_id FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id WHERE p.pickup_id = ? AND p.ngo_id = ? AND p.status = 'SCHEDULED' FOR UPDATE";
+
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                int donationId;
+                int claimId;
+
+                try (PreparedStatement ps = con.prepareStatement(checkSql)) {
+                    ps.setInt(1, pickupId);
+                    ps.setInt(2, ngoId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            con.rollback();
+                            return false;
+                        }
+                        donationId = rs.getInt("donation_id");
+                        claimId = rs.getInt("claim_id");
+                    }
+                }
+
+                // Update pickup → COMPLETED
+                String pickupSql = "UPDATE pickups SET status = 'COMPLETED', completed_at = NOW() WHERE pickup_id = ? AND status = 'SCHEDULED'";
+                try (PreparedStatement ps1 = con.prepareStatement(pickupSql)) {
+                    ps1.setInt(1, pickupId);
+                    if (ps1.executeUpdate() != 1) {
+                        con.rollback();
+                        return false;
+                    }
+                }
+
+                // Update donation → PICKED_UP
+                String donationSql = "UPDATE donations SET status = 'PICKED_UP' WHERE donation_id = ? AND status = 'CLAIMED'";
+                try (PreparedStatement ps2 = con.prepareStatement(donationSql)) {
+                    ps2.setInt(1, donationId);
+                    if (ps2.executeUpdate() != 1) {
+                        con.rollback();
+                        return false;
+                    }
+                }
+
+                // Update claim → COMPLETED
+                String claimSql = "UPDATE claims SET status = 'COMPLETED' WHERE claim_id = ?";
+                try (PreparedStatement ps3 = con.prepareStatement(claimSql)) {
+                    ps3.setInt(1, claimId);
+                    ps3.executeUpdate();
+                }
+
+                con.commit();
+                return true;
+            } catch (SQLException e) {
+                con.rollback();
+                throw e;
+            }
+        }
+    }
+
+    public List<Pickup> getAllPickups() throws SQLException {
+        List<Pickup> pickups = new ArrayList<>();
+        String sql = "SELECT p.pickup_id, p.claim_id, p.donation_id, p.ngo_id, u.name AS ngo_name, d.mess_id, h.name AS mess_name, d.food_name, d.food_type, d.quantity, d.pickup_location, p.pickup_deadline, p.pickup_date, p.scheduled_at, p.completed_at, p.status FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id INNER JOIN donations d ON p.donation_id = d.donation_id INNER JOIN users u ON p.ngo_id = u.user_id LEFT JOIN hostels h ON d.mess_id = h.hostel_id ORDER BY p.scheduled_at DESC";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                pickups.add(buildPickup(rs));
+            }
+        }
+        return pickups;
+    }
+
+    // ==================== STATISTICS ====================
+
     public int getTotalDonations() throws SQLException {
         String sql = "SELECT COUNT(*) AS total FROM donations";
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql);
-            ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return rs.getInt("total");
-            }
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getInt("total");
         }
         return 0;
     }
 
     public int getTotalFoodPickedUp() throws SQLException {
-        String sql = "SELECT COALESCE(SUM(d.quantity), 0) AS total FROM donations d INNER JOIN claims c ON d.donation_id = c.donation_id INNER JOIN pickups p ON c.claim_id = p.claim_id WHERE p.status = 'COMPLETED'";
+        String sql = "SELECT COALESCE(SUM(d.quantity), 0) AS total FROM donations d INNER JOIN pickups p ON d.donation_id = p.donation_id WHERE p.status = 'COMPLETED'";
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql);
-            ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return rs.getInt("total");
-            }
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getInt("total");
         }
         return 0;
     }
@@ -376,11 +355,9 @@ public class DonationDAO {
     public int getPendingPickups() throws SQLException {
         String sql = "SELECT COUNT(*) AS total FROM pickups WHERE status = 'SCHEDULED'";
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql);
-            ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return rs.getInt("total");
-            }
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getInt("total");
         }
         return 0;
     }
@@ -388,13 +365,52 @@ public class DonationDAO {
     public int getCompletedPickups() throws SQLException {
         String sql = "SELECT COUNT(*) AS total FROM pickups WHERE status = 'COMPLETED'";
         try (Connection con = DBConnection.getConnection();
-            PreparedStatement ps = con.prepareStatement(sql);
-            ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return rs.getInt("total");
-            }
+             PreparedStatement ps = con.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) return rs.getInt("total");
         }
         return 0;
     }
-}
 
+    // ==================== BUILDERS ====================
+
+    private Donation buildDonation(ResultSet rs) throws SQLException {
+        return new Donation(
+            rs.getInt("donation_id"),
+            rs.getInt("meal_record_id"),
+            rs.getString("mess_id"),
+            rs.getString("mess_name"),
+            rs.getString("food_name"),
+            rs.getInt("quantity"),
+            rs.getString("food_type"),
+            rs.getString("pickup_location"),
+            rs.getString("deadline"),
+            rs.getString("preparation_datetime"),
+            rs.getString("storage_conditions"),
+            rs.getString("allergens"),
+            rs.getString("status"),
+            rs.getString("created_at")
+        );
+    }
+
+    private Pickup buildPickup(ResultSet rs) throws SQLException {
+        return new Pickup(
+            rs.getInt("pickup_id"),
+            rs.getInt("claim_id"),
+            rs.getInt("donation_id"),
+            rs.getInt("ngo_id"),
+            rs.getString("ngo_name"),
+            rs.getString("mess_id"),
+            rs.getString("mess_name"),
+            rs.getString("food_name"),
+            rs.getString("food_type"),
+            rs.getInt("quantity"),
+            rs.getString("pickup_location"),
+            rs.getString("pickup_deadline"),
+            rs.getString("pickup_date"),
+            rs.getString("scheduled_at"),
+            rs.getString("completed_at"),
+            rs.getString("status")
+        );
+    }
+}
