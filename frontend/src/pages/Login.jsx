@@ -47,7 +47,7 @@ export default function Login() {
       const account = demoAccounts.find((a) => a.role === role);
       if (account) {
         setEmail(account.email);
-        setPassword('Demo@123');
+        setPassword('FoodLoop@123');
       }
 
       const res = await loginDemo(role);
@@ -459,7 +459,7 @@ export default function Login() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Demo@123"
+                  placeholder="FoodLoop@123"
                   required
                   style={{
                     width: '100%',
@@ -533,7 +533,7 @@ export default function Login() {
                 borderRadius: 'var(--radius-sm)',
               }}
             >
-              <strong>Demo Credentials:</strong> Use password <code style={{ color: 'var(--color-forest)', fontWeight: 700 }}>Demo@123</code> with <code>mess@test.com</code>, <code>ngo@test.com</code>, or <code>admin@test.com</code>.
+              <strong>Demo Credentials:</strong> Use password <code style={{ color: 'var(--color-forest)', fontWeight: 700 }}>FoodLoop@123</code> with <code>mess@test.com</code>, <code>ngo@test.com</code>, or <code>admin@test.com</code>.
             </div>
           </div>
         </div>

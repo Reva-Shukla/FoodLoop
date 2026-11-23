@@ -5,7 +5,7 @@
  * Strict Requirements:
  * - Roles: MESS, NGO, ADMIN
  * - ADMIN displayed as "Campus Supervisor" throughout frontend
- * - Demo Password: Demo@123 (temporary frontend-only demo credential)
+ * - Demo Password: FoodLoop@123 (temporary frontend-only demo credential)
  */
 
 export const USER_ROLES = {
@@ -14,7 +14,7 @@ export const USER_ROLES = {
   ADMIN: 'ADMIN',
 };
 
-export const DEMO_PASSWORD = 'Demo@123';
+export const DEMO_PASSWORD = 'FoodLoop@123';
 
 export const DEMO_ACCOUNTS = [
   {

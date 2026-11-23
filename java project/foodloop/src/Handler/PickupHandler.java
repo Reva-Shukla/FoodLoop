@@ -66,25 +66,32 @@ public class PickupHandler implements HttpHandler {
     }
 
     private void handleList(HttpExchange exchange) throws Exception {
-        SessionManager.UserSession session = AuthUtil.requireAuth(exchange);
+        SessionManager.UserSession session = AuthUtil.requireRole(exchange, "NGO", "ADMIN");
         Map<String, String> query = JsonResponseUtil.parseQueryParams(exchange);
         String statusFilter = query.get("status");
 
-        int ngoId = 0;
-        if ("NGO".equalsIgnoreCase(session.getRole())) {
-            ngoId = session.getUserId();
-        } else if (query.get("ngoId") != null) {
-            try {
-                ngoId = Integer.parseInt(query.get("ngoId"));
-            } catch (NumberFormatException ignored) {}
-        }
-
         List<Pickup> pickups;
-        if (ngoId > 0) {
-            pickups = donationDAO.getMyPickups(ngoId);
+
+        if ("NGO".equalsIgnoreCase(session.getRole())) {
+            pickups = donationDAO.getMyPickups(session.getUserId());
         } else {
-            AuthUtil.requireRole(exchange, "ADMIN");
-            pickups = donationDAO.getAllPickups();
+            String ngoIdParam = query.get("ngoId");
+
+            if (ngoIdParam != null) {
+                try {
+                    int ngoId = Integer.parseInt(ngoIdParam);
+                    if (ngoId <= 0) {
+                        JsonResponseUtil.sendError(exchange, "Invalid NGO ID", 400);
+                        return;
+                    }
+                    pickups = donationDAO.getMyPickups(ngoId);
+                } catch (NumberFormatException e) {
+                    JsonResponseUtil.sendError(exchange, "Invalid NGO ID", 400);
+                    return;
+                }
+            } else {
+                pickups = donationDAO.getAllPickups();
+            }
         }
 
         List<Map<String, Object>> result = new ArrayList<>();

@@ -1,5 +1,5 @@
-/**
- * Central FoodLoop Data Service — Phase 7D Java API Integration
+﻿/**
+ * Central FoodLoop Data Service â€” Phase 7D Java API Integration
  *
  * Replaces client-side LocalStorage mutations with live HTTP REST API calls
  * to the Java backend via apiClient:
@@ -262,39 +262,45 @@ export const foodLoopService = {
    * 18. NGO Summary Metrics
    */
   getNgoSummary: async (ngoId) => {
-    const [claims, pickups] = await Promise.all([
+    const [claims, pickups, availableDonations] = await Promise.all([
       foodLoopService.getClaims(ngoId),
       foodLoopService.getPickups(ngoId),
+      foodLoopService.getAvailableDonations(),
     ]);
 
-    let completedHandoverPortions = 0;
-    let activeScheduledPickups = 0;
-    const now = Date.now();
-    let urgentPickupsCount = 0;
+    const activeClaims = claims.filter((c) => c.status === 'ACTIVE');
 
-    for (const p of pickups) {
-      const qty = parseInt(p.portions || p.quantity, 10) || 0;
-      if (p.status === 'COMPLETED') {
-        completedHandoverPortions += qty;
-      } else if (p.status === 'SCHEDULED') {
-        activeScheduledPickups += 1;
-        if (p.pickupDeadline) {
-          const dl = new Date(p.pickupDeadline).getTime();
-          if (dl - now > 0 && dl - now < 3 * 60 * 60 * 1000) {
-            urgentPickupsCount += 1;
-          }
-        }
-      }
-    }
+    const scheduledPickups = pickups.filter(
+      (p) => p.status === 'SCHEDULED'
+    );
+
+    const completedPickups = pickups.filter(
+      (p) => p.status === 'COMPLETED'
+    );
+
+    const portionsCollected = completedPickups.reduce(
+      (total, p) => total + (parseInt(p.portions ?? p.quantity, 10) || 0),
+      0
+    );
+
+    const upcomingPickups = [...scheduledPickups]
+      .sort(
+        (a, b) =>
+          new Date(a.pickupDeadline).getTime() -
+          new Date(b.pickupDeadline).getTime()
+      )
+      .slice(0, 5);
 
     return {
-      totalClaimedBatches: claims.length,
-      activeScheduledPickups,
-      completedHandoverPortions,
-      urgentPickupsCount,
+      availableDonationsCount: availableDonations.length,
+      activeClaimsCount: activeClaims.length,
+      scheduledPickupsCount: scheduledPickups.length,
+      portionsCollected,
+      upcomingPickups,
+      recentClaims: claims.slice(0, 5),
+      recentCompletedPickups: completedPickups.slice(0, 5),
     };
   },
-
   refreshExpiredDonations: async () => {
     // Backend DonationExpiryMonitor runs continuously on the server
     return true;

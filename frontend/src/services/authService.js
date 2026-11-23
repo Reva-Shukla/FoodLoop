@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Central Authentication Service
  *
  * Connects the FoodLoop frontend to the Java backend authentication endpoints:
@@ -46,7 +46,7 @@ export const authService = {
         return {
           success: true,
           user: res.user,
-          destination: res.destination || getDestinationForRole(res.user.role),
+          destination: getDestinationForRole(res.user.role) || res.destination,
         };
       }
 
@@ -209,7 +209,7 @@ export const authService = {
   },
 
   /**
-   * Demo persona switcher — only accessible when explicitly enabled in mock mode
+   * Demo persona switcher â€” only accessible when explicitly enabled in mock mode
    */
   loginDemo: async (role) => {
     const account = getDemoAccountByRole(role);
