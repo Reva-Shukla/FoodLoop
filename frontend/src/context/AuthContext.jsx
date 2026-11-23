@@ -1,59 +1,106 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authService } from '../services/authService';
-import { storage } from '../services/storage';
 import { USER_ROLES, DEMO_ACCOUNTS } from '../data/demoAccounts';
 import { CHITKARA_CAMPUS_DIRECTORY } from '../data/hostels';
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEY_ACTIVE_HOSTEL = 'foodloop_active_hostel';
-
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    return storage.get(storage.keys.CURRENT_USER, null);
-  });
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  const [activeHostel, setActiveHostelState] = useState(() => {
-    return storage.get(STORAGE_KEY_ACTIVE_HOSTEL, CHITKARA_CAMPUS_DIRECTORY[0]);
-  });
+  // Active hostel selection (for mess managers or supervisors)
+  const [activeHostel, setActiveHostelState] = useState(CHITKARA_CAMPUS_DIRECTORY[0]);
+
+  // Session restoration on initial load via GET /api/auth/me
+  useEffect(() => {
+    let mounted = true;
+
+    async function restoreSession() {
+      try {
+        const res = await authService.getMe();
+        if (mounted && res.success && res.user) {
+          setUser(res.user);
+          if (res.user.assignedMessId) {
+            const matched = CHITKARA_CAMPUS_DIRECTORY.find(
+              (h) => h.id === res.user.assignedMessId
+            );
+            if (matched) {
+              setActiveHostelState(matched);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Session restoration check:', err.message);
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    restoreSession();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const setActiveHostel = (hostel) => {
+    // If user is a MESS manager, verify they cannot select a mess they do not manage
+    if (user && user.role === 'MESS' && user.assignedMessId) {
+      if (hostel.id !== user.assignedMessId) {
+        console.warn('Mess managers are restricted to their assigned dining hall.');
+        return;
+      }
+    }
     setActiveHostelState(hostel);
-    storage.set(STORAGE_KEY_ACTIVE_HOSTEL, hostel);
   };
 
   /**
-   * Manual email/password login
+   * Manual email/password login against live Java backend
    */
   const login = async (email, password) => {
     const res = await authService.login(email, password);
-    if (res.success) {
+    if (res.success && res.user) {
       setUser(res.user);
-      storage.set(storage.keys.CURRENT_USER, res.user);
+      if (res.user.assignedMessId) {
+        const matched = CHITKARA_CAMPUS_DIRECTORY.find(
+          (h) => h.id === res.user.assignedMessId
+        );
+        if (matched) {
+          setActiveHostelState(matched);
+        }
+      }
     }
     return res;
   };
 
   /**
-   * 1-Click Demo login by role (MESS, NGO, ADMIN)
+   * 1-Click Demo login by role
    */
   const loginDemo = async (role) => {
-    // Clear any previous role session first
-    storage.remove(storage.keys.CURRENT_USER);
     const res = await authService.loginDemo(role);
-    if (res.success) {
+    if (res.success && res.user) {
       setUser(res.user);
-      storage.set(storage.keys.CURRENT_USER, res.user);
+      if (res.user.assignedMessId) {
+        const matched = CHITKARA_CAMPUS_DIRECTORY.find(
+          (h) => h.id === res.user.assignedMessId
+        );
+        if (matched) {
+          setActiveHostelState(matched);
+        }
+      }
     }
     return res;
   };
 
   /**
-   * Logout and clear demo session
+   * Logout: Terminates server-side session and clears client state
    */
-  const logout = () => {
+  const logout = async () => {
+    await authService.logout();
     setUser(null);
-    storage.remove(storage.keys.CURRENT_USER);
   };
 
   const isAuthenticated = Boolean(user);
@@ -64,6 +111,7 @@ export const AuthProvider = ({ children }) => {
         user,
         role: user?.role || null,
         isAuthenticated,
+        loading,
         activeHostel,
         setActiveHostel,
         login,

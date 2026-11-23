@@ -103,18 +103,19 @@ export const analyticsService = {
 
     // Aggregate by meal cohort to maintain mathematical consistency
     for (const meal of meals) {
-      const prep = meal.preparedPortions || 0;
-      const srv = meal.servedPortions || 0;
+      const prep = meal.preparedPortions ?? meal.prepared ?? 0;
+      const srv = meal.servedPortions ?? meal.served ?? 0;
       const sur = Math.max(0, prep - srv);
+      const mId = String(meal.id ?? meal.mealId);
 
       totalPrepared += prep;
       totalServed += srv;
       totalSurplus += sur;
 
       // Associated donations for this meal
-      const mealDons = allDonations.filter((d) => d.mealRecordId === meal.id);
+      const mealDons = allDonations.filter((d) => String(d.mealRecordId) === mId);
       for (const d of mealDons) {
-        const qty = parseInt(d.portions, 10) || 0;
+        const qty = parseInt(d.portions ?? d.quantity, 10) || 0;
         if (d.status === 'PICKED_UP' || d.status === 'COMPLETED') {
           foodDonated += qty;
         } else if (d.status === 'AVAILABLE' || d.status === 'CLAIMED') {
@@ -123,7 +124,7 @@ export const analyticsService = {
       }
 
       // Associated waste for this meal
-      const mealWsts = allWaste.filter((w) => w.mealRecordId === meal.id);
+      const mealWsts = allWaste.filter((w) => String(w.mealRecordId) === mId);
       for (const w of mealWsts) {
         foodWasted += parseInt(w.portionsDiscarded, 10) || 0;
       }
@@ -189,15 +190,16 @@ export const analyticsService = {
       let reserved = 0;
 
       for (const meal of messMeals) {
-        const p = meal.preparedPortions || 0;
-        const s = meal.servedPortions || 0;
+        const p = meal.preparedPortions ?? meal.prepared ?? 0;
+        const s = meal.servedPortions ?? meal.served ?? 0;
+        const mId = String(meal.id ?? meal.mealId);
         prep += p;
         srv += s;
         sur += Math.max(0, p - s);
 
-        const mDons = allDonations.filter((d) => d.mealRecordId === meal.id);
+        const mDons = allDonations.filter((d) => String(d.mealRecordId) === mId);
         for (const d of mDons) {
-          const q = parseInt(d.portions, 10) || 0;
+          const q = parseInt(d.portions ?? d.quantity, 10) || 0;
           if (d.status === 'PICKED_UP' || d.status === 'COMPLETED') {
             don += q;
           } else if (d.status === 'AVAILABLE' || d.status === 'CLAIMED') {
@@ -205,7 +207,7 @@ export const analyticsService = {
           }
         }
 
-        const mWst = allWaste.filter((w) => w.mealRecordId === meal.id);
+        const mWst = allWaste.filter((w) => String(w.mealRecordId) === mId);
         for (const w of mWst) {
           wst += parseInt(w.portionsDiscarded, 10) || 0;
         }

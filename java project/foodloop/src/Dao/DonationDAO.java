@@ -12,6 +12,114 @@ public class DonationDAO {
 
     // ==================== DONATIONS ====================
 
+    public List<Donation> getDonationsByMealId(int mealRecordId) throws SQLException {
+        List<Donation> donations = new ArrayList<>();
+        String sql = "SELECT d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM donations d LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE d.meal_record_id = ? ORDER BY d.created_at DESC";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setInt(1, mealRecordId);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    donations.add(buildDonation(rs));
+                }
+            }
+        }
+        return donations;
+    }
+
+    public int addDonationWithAllocationCheck(Donation donation) throws SQLException, Util.AuthUtil.ValidationException {
+        if (donation.getMealRecordId() <= 0) {
+            String sql = "INSERT INTO donations (meal_record_id, mess_id, food_name, quantity, food_type, pickup_location, deadline, preparation_datetime, storage_conditions, allergens, status) VALUES (NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AVAILABLE')";
+            try (Connection con = DBConnection.getConnection();
+                 PreparedStatement ps = con.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+                ps.setString(1, donation.getMessId());
+                ps.setString(2, donation.getFoodName());
+                ps.setInt(3, donation.getQuantity());
+                ps.setString(4, donation.getFoodType());
+                ps.setString(5, donation.getPickupLocation());
+                ps.setString(6, donation.getDeadline());
+                ps.setString(7, donation.getPreparationDatetime());
+                ps.setString(8, donation.getStorageConditions());
+                ps.setString(9, donation.getAllergens());
+                ps.executeUpdate();
+                try (ResultSet rs = ps.getGeneratedKeys()) {
+                    if (rs.next()) return rs.getInt(1);
+                }
+            }
+            return 1;
+        }
+
+        try (Connection con = DBConnection.getConnection()) {
+            con.setAutoCommit(false);
+            try {
+                int surplus = 0;
+                String mealSql = "SELECT surplus FROM meal_records WHERE meal_id = ? FOR UPDATE";
+                try (PreparedStatement ps = con.prepareStatement(mealSql)) {
+                    ps.setInt(1, donation.getMealRecordId());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (!rs.next()) {
+                            con.rollback();
+                            throw new Util.AuthUtil.NotFoundException("Parent meal record not found: " + donation.getMealRecordId());
+                        }
+                        surplus = rs.getInt("surplus");
+                    }
+                }
+
+                int allocatedDonations = 0;
+                String donSumSql = "SELECT COALESCE(SUM(quantity), 0) AS total FROM donations WHERE meal_record_id = ? AND status IN ('AVAILABLE', 'CLAIMED', 'PICKED_UP')";
+                try (PreparedStatement ps = con.prepareStatement(donSumSql)) {
+                    ps.setInt(1, donation.getMealRecordId());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) allocatedDonations = rs.getInt("total");
+                    }
+                }
+
+                int allocatedWaste = 0;
+                String wasteSumSql = "SELECT COALESCE(SUM(portions_discarded), 0) AS total FROM waste_records WHERE meal_record_id = ?";
+                try (PreparedStatement ps = con.prepareStatement(wasteSumSql)) {
+                    ps.setInt(1, donation.getMealRecordId());
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) allocatedWaste = rs.getInt("total");
+                    }
+                }
+
+                int unallocatedSurplus = Math.max(0, surplus - allocatedDonations - allocatedWaste);
+                if (donation.getQuantity() > unallocatedSurplus) {
+                    con.rollback();
+                    throw new Util.AuthUtil.ValidationException(
+                        "Donation portion volume (" + donation.getQuantity() + ") exceeds available unallocated surplus (" + unallocatedSurplus + ")."
+                    );
+                }
+
+                String insertSql = "INSERT INTO donations (meal_record_id, mess_id, food_name, quantity, food_type, pickup_location, deadline, preparation_datetime, storage_conditions, allergens, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'AVAILABLE')";
+                int generatedId = 0;
+                try (PreparedStatement ps = con.prepareStatement(insertSql, Statement.RETURN_GENERATED_KEYS)) {
+                    ps.setInt(1, donation.getMealRecordId());
+                    ps.setString(2, donation.getMessId());
+                    ps.setString(3, donation.getFoodName());
+                    ps.setInt(4, donation.getQuantity());
+                    ps.setString(5, donation.getFoodType());
+                    ps.setString(6, donation.getPickupLocation());
+                    ps.setString(7, donation.getDeadline());
+                    ps.setString(8, donation.getPreparationDatetime());
+                    ps.setString(9, donation.getStorageConditions());
+                    ps.setString(10, donation.getAllergens());
+                    ps.executeUpdate();
+                    try (ResultSet rs = ps.getGeneratedKeys()) {
+                        if (rs.next()) generatedId = rs.getInt(1);
+                    }
+                }
+
+                con.commit();
+                return generatedId;
+            } catch (SQLException | RuntimeException e) {
+                con.rollback();
+                throw e;
+            }
+        }
+    }
+
     public boolean addDonation(Donation donation) throws SQLException {
         String sql = "INSERT INTO donations (meal_record_id, mess_id, food_name, quantity, food_type, pickup_location, deadline, preparation_datetime, storage_conditions, allergens) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
@@ -91,7 +199,7 @@ public class DonationDAO {
 
     public List<Donation> getAvailableDonations() throws SQLException {
         List<Donation> donations = new ArrayList<>();
-        String sql = "SELECT d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM donations d LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE d.status = 'AVAILABLE' AND d.deadline > NOW() ORDER BY d.deadline ASC";
+        String sql = "SELECT d.donation_id, d.meal_record_id, d.mess_id, h.name AS mess_name, d.food_name, d.quantity, d.food_type, d.pickup_location, d.deadline, d.preparation_datetime, d.storage_conditions, d.allergens, d.status, d.created_at FROM donations d LEFT JOIN hostels h ON d.mess_id = h.hostel_id WHERE d.status = 'AVAILABLE' AND d.deadline > NOW() AND d.is_demo = FALSE ORDER BY d.deadline ASC";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql);
@@ -120,7 +228,7 @@ public class DonationDAO {
     // ==================== CLAIMS ====================
 
     public boolean claimDonation(int donationId, int ngoId) throws SQLException {
-        String checkSql = "SELECT d.donation_id, d.deadline, d.pickup_location FROM donations d WHERE d.donation_id = ? AND d.status = 'AVAILABLE' AND d.deadline > NOW() FOR UPDATE";
+        String checkSql = "SELECT d.donation_id, d.deadline, d.pickup_location FROM donations d WHERE d.donation_id = ? AND d.status = 'AVAILABLE' AND d.deadline > NOW() AND d.is_demo = FALSE FOR UPDATE";
 
         try (Connection con = DBConnection.getConnection()) {
             con.setAutoCommit(false);
@@ -259,7 +367,7 @@ public class DonationDAO {
     }
 
     public boolean completePickup(int pickupId, int ngoId) throws SQLException {
-        String checkSql = "SELECT p.pickup_id, p.donation_id, c.claim_id FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id WHERE p.pickup_id = ? AND p.ngo_id = ? AND p.status = 'SCHEDULED' FOR UPDATE";
+        String checkSql = "SELECT p.pickup_id, p.donation_id, c.claim_id, p.pickup_deadline, p.status FROM pickups p INNER JOIN claims c ON p.claim_id = c.claim_id WHERE p.pickup_id = ? AND p.ngo_id = ? FOR UPDATE";
 
         try (Connection con = DBConnection.getConnection()) {
             con.setAutoCommit(false);
@@ -274,6 +382,16 @@ public class DonationDAO {
                         if (!rs.next()) {
                             con.rollback();
                             return false;
+                        }
+                        String status = rs.getString("status");
+                        if (!"SCHEDULED".equalsIgnoreCase(status)) {
+                            con.rollback();
+                            throw new Util.AuthUtil.ConflictException("Pickup is already " + status + " and cannot be completed.");
+                        }
+                        Timestamp deadline = rs.getTimestamp("pickup_deadline");
+                        if (deadline != null && deadline.before(new Timestamp(System.currentTimeMillis()))) {
+                            con.rollback();
+                            throw new Util.AuthUtil.ConflictException("Collection deadline has expired. This pickup cannot be completed.");
                         }
                         donationId = rs.getInt("donation_id");
                         claimId = rs.getInt("claim_id");

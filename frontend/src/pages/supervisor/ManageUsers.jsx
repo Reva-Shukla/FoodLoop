@@ -1,20 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../../layouts/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
+import { apiClient } from '../../services/apiClient';
 import { MOCK_CAMPUS_USERS, MOCK_REGISTRATION_REQUESTS } from '../../data/mockUsers';
-import {
-  Users,
-  Search,
-  Filter,
-  CheckCircle2,
-  Clock,
-  ShieldCheck,
-  UserCheck,
-  Building2,
-  HeartHandshake,
-  UserX,
-  Info
-} from 'lucide-react';
 
 export default function ManageUsers() {
   const { user } = useAuth();
@@ -22,6 +10,30 @@ export default function ManageUsers() {
   const [activeTab, setActiveTab] = useState('USERS'); // 'USERS' | 'APPROVALS'
   const [roleFilter, setRoleFilter] = useState('ALL'); // 'ALL' | 'MESS' | 'NGO' | 'ADMIN'
   const [search, setSearch] = useState('');
+  const [users, setUsers] = useState(MOCK_CAMPUS_USERS);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+
+  // Fetch real campus users from GET /api/supervisor/users
+  useEffect(() => {
+    let mounted = true;
+    async function fetchUsers() {
+      try {
+        setLoadingUsers(true);
+        const data = await apiClient.get('/supervisor/users');
+        if (mounted && Array.isArray(data) && data.length > 0) {
+          setUsers(data);
+        }
+      } catch (err) {
+        console.warn('GET /api/supervisor/users:', err.message);
+      } finally {
+        if (mounted) setLoadingUsers(false);
+      }
+    }
+    fetchUsers();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Modular Registration Requests Demo State
   const [requests, setRequests] = useState(MOCK_REGISTRATION_REQUESTS);
@@ -29,7 +41,7 @@ export default function ManageUsers() {
 
   // Filtered Users
   const filteredUsers = useMemo(() => {
-    return MOCK_CAMPUS_USERS.filter((u) => {
+    return users.filter((u) => {
       if (roleFilter !== 'ALL' && u.role !== roleFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();

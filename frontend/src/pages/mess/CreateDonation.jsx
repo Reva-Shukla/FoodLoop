@@ -68,8 +68,9 @@ export default function CreateDonation() {
       const results = [];
 
       for (const m of messMeals) {
-        const alloc = await getMealAllocations(m.id);
-        if (alloc.unallocatedSurplus > 0) {
+        const mealId = m.id || m.mealId;
+        const alloc = await getMealAllocations(mealId);
+        if (alloc && alloc.unallocatedSurplus > 0) {
           results.push({ meal: m, alloc });
         }
       }
@@ -77,16 +78,16 @@ export default function CreateDonation() {
       if (mounted) {
         setEligibleMeals(results);
         if (preselectedMealId) {
-          const match = results.find((r) => r.meal.id === preselectedMealId);
+          const match = results.find((r) => String(r.meal.id || r.meal.mealId) === String(preselectedMealId));
           if (match) {
-            setSelectedMealId(match.meal.id);
+            setSelectedMealId(match.meal.id || match.meal.mealId);
             setSelectedMealAlloc(match.alloc);
           } else if (results.length > 0) {
-            setSelectedMealId(results[0].meal.id);
+            setSelectedMealId(results[0].meal.id || results[0].meal.mealId);
             setSelectedMealAlloc(results[0].alloc);
           }
         } else if (results.length > 0) {
-          setSelectedMealId(results[0].meal.id);
+          setSelectedMealId(results[0].meal.id || results[0].meal.mealId);
           setSelectedMealAlloc(results[0].alloc);
         }
         setLoadingEligible(false);
@@ -105,7 +106,7 @@ export default function CreateDonation() {
     setSelectedMealId(mealId);
     setError('');
 
-    const match = eligibleMeals.find((r) => r.meal.id === mealId);
+    const match = eligibleMeals.find((r) => String(r.meal.id || r.meal.mealId) === String(mealId));
     if (match) {
       setSelectedMealAlloc(match.alloc);
     } else if (mealId) {
@@ -116,7 +117,9 @@ export default function CreateDonation() {
     }
   };
 
-  const selectedMeal = selectedMealAlloc?.meal;
+  const selectedMeal =
+    eligibleMeals.find((r) => String(r.meal.id || r.meal.mealId) === String(selectedMealId))?.meal ||
+    mealRecords.find((m) => String(m.id || m.mealId) === String(selectedMealId));
   const maxAvailable = selectedMealAlloc?.unallocatedSurplus || 0;
 
   const handleSubmit = async (e) => {
@@ -171,7 +174,7 @@ export default function CreateDonation() {
     setLoading(true);
     try {
       await createDonation({
-        mealRecordId: selectedMeal.id,
+        mealRecordId: selectedMeal.id || selectedMeal.mealId,
         messId: activeHostel?.id || 'mess-b-franklin',
         messName: activeHostel?.name || 'Franklin Mess',
         foodName: selectedMeal.foodName,

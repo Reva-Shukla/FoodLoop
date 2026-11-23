@@ -10,6 +10,9 @@ public class DBConnection {
     public static Connection getConnection() throws SQLException {
         String url = System.getenv("foodloopURL");
         if (url == null || url.isEmpty()) {
+            url = System.getenv("FOODLOOP_URL");
+        }
+        if (url == null || url.isEmpty()) {
             url = DEFAULT_URL;
         }
 
