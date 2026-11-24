@@ -45,7 +45,12 @@ export default function MessDashboard() {
     let mounted = true;
     getMessSummary(messId, timeFilter).then((res) => {
       if (mounted) {
-        setSummary(res);
+        setSummary((prev) => ({
+          ...prev,
+          ...res,
+          recentMeals: res?.recentMeals ?? [],
+          recentDonations: res?.recentDonations ?? [],
+        }));
       }
     });
     return () => {
@@ -674,18 +679,18 @@ export default function MessDashboard() {
                           don.status === 'AVAILABLE'
                             ? 'var(--color-saffron-light)'
                             : don.status === 'CLAIMED'
-                            ? 'var(--color-terracotta-light)'
-                            : don.status === 'PICKED_UP' || don.status === 'COMPLETED'
-                            ? 'var(--color-sage-light)'
-                            : '#FDECE8',
+                              ? 'var(--color-terracotta-light)'
+                              : don.status === 'PICKED_UP' || don.status === 'COMPLETED'
+                                ? 'var(--color-sage-light)'
+                                : '#FDECE8',
                         color:
                           don.status === 'AVAILABLE'
                             ? 'var(--color-saffron-dark)'
                             : don.status === 'CLAIMED'
-                            ? 'var(--color-terracotta)'
-                            : don.status === 'PICKED_UP' || don.status === 'COMPLETED'
-                            ? 'var(--color-forest)'
-                            : '#A83B24',
+                              ? 'var(--color-terracotta)'
+                              : don.status === 'PICKED_UP' || don.status === 'COMPLETED'
+                                ? 'var(--color-forest)'
+                                : '#A83B24',
                       }}
                     >
                       {don.status}

@@ -24,3 +24,4 @@ UNION ALL
 SELECT 'donations', SUM(is_demo=0), SUM(is_demo=1) FROM donations
 UNION ALL
 SELECT 'waste_records', SUM(is_demo=0), SUM(is_demo=1) FROM waste_records;
+

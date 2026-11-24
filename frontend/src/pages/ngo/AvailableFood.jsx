@@ -4,7 +4,7 @@ import DashboardLayout from '../../layouts/DashboardLayout';
 import { useAuth } from '../../context/AuthContext';
 import { useFoodLoop } from '../../context/FoodLoopContext';
 import DonationDetailsModal from '../../components/ngo/DonationDetailsModal';
-import { CHITKARA_CAMPUS_DIRECTORY } from '../../data/hostels';
+import { CHITKARA_CAMPUS_DIRECTORY, HOSTEL_CATEGORIES } from '../../data/hostels';
 import {
   Utensils,
   Search,
@@ -108,6 +108,10 @@ export default function AvailableFood() {
   const filteredDonations = useMemo(() => {
     let result = availableList.filter((d) => {
       // Must be AVAILABLE and unexpired
+      console.log('DONATION MESS DATA:', availableList.map(d => ({
+        messId: d.messId,
+        messName: d.messName
+      })));
       if (d.status !== 'AVAILABLE') return false;
       if (new Date(d.pickupDeadline) <= new Date()) return false;
 
@@ -122,7 +126,7 @@ export default function AvailableFood() {
       // Hostel Category
       if (categoryFilter !== 'ALL') {
         const messInfo = CHITKARA_CAMPUS_DIRECTORY.find((h) => h.id === d.messId);
-        if (messInfo && messInfo.category !== categoryFilter) return false;
+        if (!messInfo || messInfo.category !== categoryFilter) return false;
       }
 
       // Specific Mess
@@ -278,8 +282,8 @@ export default function AvailableFood() {
                 }}
               >
                 <option value="ALL">All Hostels</option>
-                <option value="BOYS">Boys' Hostels (4)</option>
-                <option value="GIRLS">Girls' Hostels (3)</option>
+                <option value={HOSTEL_CATEGORIES.BOYS}>Boys' Hostels (4)</option>
+                <option value={HOSTEL_CATEGORIES.GIRLS}>Girls' Hostels (3)</option>
               </select>
             </div>
 
@@ -624,6 +628,7 @@ export default function AvailableFood() {
                     </button>
                   </div>
                 </div>
+
               );
             })}
           </div>
